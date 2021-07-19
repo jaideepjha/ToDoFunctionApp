@@ -11,9 +11,16 @@ using ToDOFunctionApp.Services;
 using ToDOFunctionApp.Models;
 using System.Collections.Generic;
 using System.Net.Http;
+using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
+using Microsoft.OpenApi.Models;
+using System.Net;
 
 namespace ToDOFunctionApp
 {
+    class Response
+    {
+        public string Message { get; set; }
+    }
     public class Function1
     {
         private readonly CosmosDbService cdb;
@@ -21,57 +28,27 @@ namespace ToDOFunctionApp
         {
             this.cdb = cdbs;
         }
-        //[FunctionName("GetToDoItem")]
-        //public async Task<IActionResult> GetToDoItem(
-        //    [HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", Route = null)] HttpRequest req,
-        //    ILogger log)
-        //{
-        //    log.LogInformation("C# HTTP trigger function processed a request.");
-
-        //    string name = req.Query["TaskId"];
-
-        //    string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-        //    dynamic data = JsonConvert.DeserializeObject(requestBody);
-        //    name = name ?? data?.name;
-
-        //    name = name == null ? "5c86dc01-a2bc-4f2a-afd1-c1191ebba1dd" : "";
-
-
-        //    //string responseMessage = string.IsNullOrEmpty(name)
-        //    //    ? "This HTTP triggered function executed successfully. Pass a name in the query string or in the request body for a personalized response."
-        //    //    : $"Hello, {name}. This HTTP triggered function executed successfully.";
-        //    var responseMessage = await cdb.GetItemAsync(name);
-
-        //    return new OkObjectResult(responseMessage);
-        //}
-
 
         [FunctionName("Create_ToDo")]
-        public async Task CreateToDo(
+        [OpenApiOperation(operationId: "Create ToDo Item", tags: new[] { "Create ToDo Item" })]
+        [OpenApiParameter(name: "item", Required = true, Type = typeof(Item), Description = "Example Item object: {\"name\":\"create ADO task for review\",\"description\":\"security review for PJA\",\"isComplete\":false}")]
+        [OpenApiResponseWithBody(statusCode: HttpStatusCode.OK, contentType: "application/json", bodyType: typeof(Response), Summary = "Returns ID of created ToDo item")]
+        public async Task<IActionResult> CreateToDo(
             [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = null)] Item todoItem,
             ILogger log)
         {
             log.LogInformation("C# HTTP trigger function processed a request.");
 
-            //string name = req.Query["name"];
-
-            //string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-
-            //var todoItem =  req.Content.ReadAsAsync<Item>().Result;
-            //req.Content.
-            //var todoItem = JsonConvert.DeserializeObject<Item>(requestBody);
-            //name = name ?? data?.name;
-
-            //string responseMessage = string.IsNullOrEmpty(name)
-            //    ? "This HTTP triggered function executed successfully. Pass a name in the query string or in the request body for a personalized response."
-            //    : $"Hello, {name}. This HTTP triggered function executed successfully.";
             todoItem.id = Guid.NewGuid().ToString();
             await cdb.AddItemAsync(todoItem);
-            //return new OkObjectResult(responseMessage);
+            var r = new Response() { Message = $"Task Item {todoItem.id} created !" };
+            return new OkObjectResult(r);
         }
 
 
         [FunctionName("GetAll")]
+        [OpenApiOperation(operationId: "Get All Items", tags: new[] { "Get All Items" })]
+        [OpenApiResponseWithBody(statusCode: HttpStatusCode.OK, contentType: "application/json", bodyType: typeof(IEnumerable<Item>), Summary = "Returns ID of created ToDo item")]
         public async Task<IEnumerable<Item>> GetAll(
             [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = null)] HttpRequest req,
             ILogger log)
@@ -82,6 +59,9 @@ namespace ToDOFunctionApp
         }
 
         [FunctionName("GetTaskItem")]
+        [OpenApiOperation(operationId: "Get a Task Item", tags: new[] { "Get Task Item" })]
+        [OpenApiParameter(name: "id", Required = true, In = ParameterLocation.Path, Type = typeof(string), Description = "Example Item ID: a94c0dff-e50b-4309-9e87-f222f7dcbe00")]
+        [OpenApiResponseWithBody(statusCode: HttpStatusCode.OK, contentType: "application/json", bodyType: typeof(Item), Summary = "Returns a ToDo item")]
         public async Task<ActionResult<Item>> GetTaskItem(
             [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "GetTaskItem/{id}")] HttpRequestMessage req,string id,
             ILogger log)
@@ -101,6 +81,9 @@ namespace ToDOFunctionApp
         }
 
         [FunctionName("EditTaskItem")]
+        [OpenApiOperation(operationId: "Edit Task Item", tags: new[] { "Edit Task Item" })]
+        [OpenApiParameter(name: "Item", Required = true, Type = typeof(Item), Description = "Example Item object: {\"id\":\"0c17382c-7325-4b4d-bdb3-14d5f82f9954\",\"name\":\"create ADO task for review\",\"description\":\"security review for PJA\",\"isComplete\":false}")]
+        [OpenApiResponseWithBody(statusCode: HttpStatusCode.OK, contentType: "application/json", bodyType: typeof(Response), Summary = "Returns ID of created ToDo item")]
         public async Task<ActionResult> EditTaskItem(
             [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = null)] Item taskitem,
             ILogger log)
@@ -112,10 +95,14 @@ namespace ToDOFunctionApp
 
             await cdb.UpdateItemAsync(taskitem.id, taskitem);
             //return OkResult;
-            return new ObjectResult($"Task Item {taskitem.id} modified !");
+            var r = new Response() { Message = $"Task Item {taskitem.id} modified !" };
+            return new ObjectResult(r);
         }
 
         [FunctionName("DeleteTaskItem")]
+        [OpenApiOperation(operationId: "Delete Task Item", tags: new[] { "DeleteTaskItem" })]
+        [OpenApiParameter(name: "id", Required = true, In = ParameterLocation.Path, Type = typeof(string), Description = "Example Item ID: a94c0dff-e50b-4309-9e87-f222f7dcbe00")]
+        [OpenApiResponseWithBody(statusCode: HttpStatusCode.OK, contentType: "application/json", bodyType: typeof(Item), Summary = "Deletes a ToDo item")]
         public async Task<ActionResult<Item>> DeleteTaskItem(
             [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "GetTaskItem/{id}")] HttpRequestMessage req, string id,
             ILogger log)
@@ -126,7 +113,8 @@ namespace ToDOFunctionApp
             }
 
             await cdb.DeleteItemAsync(id);
-            return new OkObjectResult($"Task Item {id} deleted !");
+            var r = new Response() { Message = $"Task Item {id} deleted !" };
+            return new OkObjectResult(r);
             //return new OkObjectResult(responseMessage);
         }
 
